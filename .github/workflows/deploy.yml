@@ -1,4 +1,4 @@
-name: Deploy to EKS
+name: CI/CD to EKS
 
 on:
   push:
@@ -21,8 +21,22 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Test AWS
-        run: aws sts get-caller-identity
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+          | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t app:latest .
+
+      - name: Tag image
+        run: |
+          docker tag app:latest ${{ secrets.ECR_REGISTRY }}/app:latest
+
+      - name: Push image
+        run: |
+          docker push ${{ secrets.ECR_REGISTRY }}/app:latest
 
       - name: Update kubeconfig
         run: |
@@ -30,5 +44,7 @@ jobs:
             --name ${{ secrets.CLUSTER_NAME }} \
             --region ${{ secrets.AWS_REGION }}
 
-      - name: Check cluster
-        run: kubectl get nodes
+      - name: Deploy to EKS
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
