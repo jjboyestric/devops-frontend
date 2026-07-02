@@ -31,6 +31,14 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Debug token
+        run: |
+          if [ -z "${{ secrets.AWS_SESSION_TOKEN }}" ]; then
+            echo "TOKEN VACÍO ❌"
+          else
+            echo "TOKEN OK ✅"
+          fi
+
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --name ${{ secrets.CLUSTER_NAME }}
