@@ -1,4 +1,4 @@
-name: Deploy Frontend to EC2
+name: Build and Push Frontend Image
 
 on:
   push:
@@ -6,34 +6,34 @@ on:
       - deploy
 
 jobs:
-  build-push-deploy:
+  build-push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Descargar codigo del repositorio
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Iniciar sesion en Docker Hub
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Construir imagen Docker del Frontend
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend-innovatech:latest .
+      - name: Build
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/frontend:latest .
 
-      - name: Publicar imagen en Docker Hub
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/frontend-innovatech:latest
+      - name: Push
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/frontend:latest
 
-      - name: Desplegar Frontend en EC2
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo docker stop frontend-app || true
-            sudo docker rm frontend-app || true
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/frontend-innovatech:latest
-            sudo docker run -d --name frontend-app -p 80:80 --restart always ${{ secrets.DOCKER_USERNAME }}/frontend-innovatech:latest
-            sudo docker image prune -f
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.CLUSTER_NAME }}
+
+      - name: Restart frontend
+        run: |
+          kubectl rollout restart deployment frontend
